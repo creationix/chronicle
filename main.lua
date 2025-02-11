@@ -1,4 +1,9 @@
-local uv = require 'luv'
+local is_luvit = false
+local ok, uv = pcall(require, 'luv')
+if not ok then
+    is_luvit = true
+    uv = require 'uv'
+end
 
 -- Multicast UDP example
 -- listens on 224.0.0.1 (all machines on subnet) on port 31896
@@ -68,4 +73,6 @@ timer:start(1000, 1000, function()
     end))
 end)
 
-uv.run()
+if not is_luvit then
+    uv.run()
+end
