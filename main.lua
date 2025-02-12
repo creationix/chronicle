@@ -61,15 +61,12 @@ end
 
 local function send(socket, message)
     local addr = assert(socket:getsockname())
-    print(string.format("Sending to multicast network %s:%s...",
-        addr.ip, addr.port,
-        multicast_addr.ip, multicast_addr.port))
+    print(string.format("Sending to multicast network %s:%s...", multicast_addr.ip, multicast_addr.port))
     assert(socket:send(message, multicast_addr.ip, multicast_addr.port, log_error))
 end
 
 local timer = assert(uv.new_timer())
 timer:start(2000, 2000, function()
-    send(multi, string.format("%s: sending from multi %s", name, uv.hrtime()))
     send(udp_sender, string.format("%s: sending from udp_sender %s", name, uv.hrtime()))
 end)
 
