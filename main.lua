@@ -43,6 +43,7 @@ assert(multi:set_membership(multicast_addr.ip, "0.0.0.0", "join"))
 local address3 = assert(multi:getsockname())
 print(string.format("Multicast receiver listening on %s:%s (interface %s)\n",
     multicast_addr.ip, address3.port, address3.ip));
+assert(multi:set_multicast_ttl(10))
 
 -- Listen for multicast events
 multi:recv_start(function(err, data, addr)
@@ -59,15 +60,52 @@ local function log_error(err)
     if err then error(err) end
 end
 
-local function send(socket, message)
-    local addr = assert(socket:getsockname())
-    print(string.format("Sending to multicast network %s:%s...", multicast_addr.ip, multicast_addr.port))
-    assert(socket:send(message, multicast_addr.ip, multicast_addr.port, log_error))
+local function send(message, cb)
+    assert(udp_sender:send(string.format("%s: %s", name, message), multicast_addr.ip, multicast_addr.port,
+        cb or log_error))
 end
 
-local timer = assert(uv.new_timer())
-timer:start(2000, 2000, function()
-    send(udp_sender, string.format("%s: sending from udp_sender %s", name, uv.hrtime()))
+send("HELLO")
+
+
+multi:recv_start(function(err, data, addr)
+    if err then
+        print("Error reading multicast messages: " .. tostring(err))
+        return
+    elseif data == nil then
+        return
+    end
+    local sender, message = data:match("(%S+):%s*(.*)")
+    if sender and message then
+        if sender == name then
+            -- print(string.format("Received my own message: %s", message))
+        else
+            print(string.format("%s:%s(%s) - %s", addr.ip, addr.port, sender, message))
+            if message == "HELLO" then
+                send("WELCOME")
+            end
+        end
+    else
+        print(string.format("Received malformed message: %s", tostring(data)))
+    end
+end)
+
+-- Send goodbye on sigint
+local sig = assert(uv.new_signal())
+uv.signal_start(sig, "sigint", function()
+    print("Received SIGINT, shutting down...")
+    multi:close()
+    server:close()
+    sig:close()
+    send("GOODBYE", function(err)
+        if err then
+            print("Error sending goodbye message: " .. tostring(err))
+        else
+            print("Goodbye message sent.")
+        end
+        udp_sender:close()
+        uv.stop()
+    end)
 end)
 
 if not is_luvit then
