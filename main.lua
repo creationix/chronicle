@@ -3,10 +3,10 @@ local uv = require 'uv'
 local name = string.format("%s@%s", os.getenv("USER") or "unknown", os.getenv("HOSTNAME") or "unknown")
 
 -- You can use netcat to send test messages to this service
--- echo "this is a test" | nc -u -w0 239.255.13.7 31896
+-- echo "this is a test" | nc -u -w0 224.0.0.1 31896
 local multicast_addr = {
     family = "inet",
-    ip = "239.255.13.7",
+    ip = "224.0.0.1",
     port = 31896,
 }
 
