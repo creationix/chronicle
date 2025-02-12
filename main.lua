@@ -46,7 +46,8 @@ assert(multi:set_membership(multicast_addr.ip, lan_ipv4, "join"))
 local address3 = assert(multi:getsockname())
 print(string.format("Multicast receiver listening on %s:%s (interface %s)\n",
     multicast_addr.ip, address3.port, address3.ip));
-assert(multi:set_multicast_ttl(10))
+assert(multi:set_multicast_loop(true))
+assert(multi:set_multicast_ttl(2))
 
 local function log_error(err)
     if err then error(err) end
@@ -55,7 +56,8 @@ end
 local send_udp = assert(uv.new_udp(address.family))
 -- Bind to a matching IP and port as the TCP server.
 assert(send_udp:bind(address.ip, address.port, { reuseaddr = false }))
-
+assert(send_udp:set_multicast_loop(true))
+assert(send_udp:set_multicast_ttl(2))
 
 local clock = 0
 local function send(message, cb, addr)
@@ -114,7 +116,7 @@ local function on_udp(err, data, addr)
     local newclock = tonumber(nclock)
     if sender and newclock and message then
         print("<- " .. tostring(data))
-        if sender == name then
+        if addr.ip == lan_ipv4 and addr.port == address.port then
             -- print(string.format("Received my own message: %s", message))
         else
             if message == "HELLO" or message == "WELCOME" then
