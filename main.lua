@@ -118,11 +118,11 @@ multi:recv_start(function(err, data, addr)
         if sender == name then
             -- print(string.format("Received my own message: %s", message))
         else
-            if message == "HELLO" then
+            if message == "HELLO" or message == "WELCOME" then
                 if add_peer(sender, addr) then
                     show_peers()
-                    if newclock < clock then
-                        send("HELLO")
+                    if message == "HELLO" then
+                        send("WELCOME")
                     end
                 end
             elseif message == "GOODBYE" then
