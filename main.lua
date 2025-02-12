@@ -38,7 +38,7 @@ print(string.format("TCP Server listening on %s:%s", address.ip, address.port))
 local multi = assert(uv.new_udp(multicast_addr.family))
 -- Bind to 239.255.13.7:31896, allow port re-use so that multiple instances
 -- of this program can all subscribe to the UDP broadcasts
-assert(multi:bind(lan_ipv4, multicast_addr.port, { reuseaddr = true }))
+assert(multi:bind("0.0.0.0", multicast_addr.port, { reuseaddr = true }))
 -- Join the multicast group on 239.255.13.7
 assert(multi:set_membership(multicast_addr.ip, lan_ipv4, "join"))
 local address3 = assert(multi:getsockname())
