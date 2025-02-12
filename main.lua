@@ -93,6 +93,14 @@ local function remove_peer(name, addr)
     peers[key] = nil
 end
 
+local function jitter(fn)
+    local timer = assert(uv.new_timer())
+    timer:start(math.random(10, 500), 0, function()
+        fn()
+        timer:close()
+    end)
+end
+
 local function on_udp(err, data, addr)
     if err then
         print("Error reading multicast messages: " .. tostring(err))
@@ -109,7 +117,9 @@ local function on_udp(err, data, addr)
         else
             if message == "HELLO" or message == "WELCOME" then
                 if message == "HELLO" then
-                    send("WELCOME", nil, addr)
+                    jitter(function()
+                        send("WELCOME", nil, addr)
+                    end)
                 end
                 if add_peer(sender, addr) then
                     show_peers()
