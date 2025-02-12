@@ -65,6 +65,32 @@ local function send(message, cb)
         cb or log_error))
 end
 
+local peers = {}
+
+local function show_peers()
+    print("Current peers:")
+    local peer_count = 0
+    for k, v in pairs(peers) do
+        print(string.format("  %s -> %s", k, v))
+        peer_count = peer_count + 1
+    end
+    if peer_count == 0 then
+        print("  No peers found.")
+    end
+    print()
+end
+
+local function add_peer(name, addr)
+    local key = string.format("%s:%s", addr.ip, addr.port)
+    peers[key] = name
+    show_peers()
+end
+local function remove_peer(name, addr)
+    local key = string.format("%s:%s", addr.ip, addr.port)
+    peers[key] = nil
+    show_peers()
+end
+
 send("HELLO")
 
 
@@ -82,7 +108,12 @@ multi:recv_start(function(err, data, addr)
         else
             print(string.format("%s:%s(%s) - %s", addr.ip, addr.port, sender, message))
             if message == "HELLO" then
+                add_peer(sender, addr)
                 send("WELCOME")
+            elseif message == "GOODBYE" then
+                remove_peer(sender, addr)
+            elseif message == "WELCOME" then
+                add_peer(sender, addr)
             end
         end
     else
