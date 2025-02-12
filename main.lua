@@ -121,9 +121,9 @@ multi:recv_start(function(err, data, addr)
             if message == "HELLO" or message == "WELCOME" then
                 if add_peer(sender, addr) then
                     show_peers()
-                    if message == "HELLO" then
-                        send("WELCOME")
-                    end
+                end
+                if message == "HELLO" then
+                    send("WELCOME")
                 end
             elseif message == "GOODBYE" then
                 remove_peer(sender, addr)
