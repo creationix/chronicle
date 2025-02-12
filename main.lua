@@ -60,8 +60,12 @@ local function log_error(err)
     if err then error(err) end
 end
 
+local clock = 0
 local function send(message, cb)
-    assert(udp_sender:send(string.format("%s: %s", name, message), multicast_addr.ip, multicast_addr.port,
+    clock = clock + 1
+    local out = string.format("%s: %d %s", name, clock, message)
+    print("-> " .. out)
+    assert(udp_sender:send(out, multicast_addr.ip, multicast_addr.port,
         cb or log_error))
 end
 
@@ -82,17 +86,16 @@ end
 
 local function add_peer(name, addr)
     local key = string.format("%s:%s", addr.ip, addr.port)
+    if peers[key] then
+        return false
+    end
     peers[key] = name
-    show_peers()
+    return true
 end
 local function remove_peer(name, addr)
     local key = string.format("%s:%s", addr.ip, addr.port)
     peers[key] = nil
-    show_peers()
 end
-
-send("HELLO")
-
 
 multi:recv_start(function(err, data, addr)
     if err then
@@ -101,25 +104,34 @@ multi:recv_start(function(err, data, addr)
     elseif data == nil then
         return
     end
-    local sender, message = data:match("(%S+):%s*(.*)")
-    if sender and message then
+    local sender, nclock, message = data:match("(%S+):%s*(%d+)%s*(.*)")
+    local newclock = tonumber(nclock)
+    if sender and newclock and message then
         if sender == name then
             -- print(string.format("Received my own message: %s", message))
         else
-            print(string.format("%s:%s(%s) - %s", addr.ip, addr.port, sender, message))
+            print("<- " .. tostring(data))
             if message == "HELLO" then
-                add_peer(sender, addr)
-                send("WELCOME")
+                if newclock < clock then
+                    send("HELLO")
+                end
+                if add_peer(sender, addr) then
+                    show_peers()
+                end
             elseif message == "GOODBYE" then
                 remove_peer(sender, addr)
-            elseif message == "WELCOME" then
-                add_peer(sender, addr)
+                show_peers()
             end
+        end
+        if newclock > clock then
+            clock = newclock
         end
     else
         print(string.format("Received malformed message: %s", tostring(data)))
     end
 end)
+
+send("HELLO")
 
 -- Send goodbye on sigint
 local sig = assert(uv.new_signal())
