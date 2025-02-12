@@ -1,9 +1,4 @@
-local is_luvit = false
-local ok, uv = pcall(require, 'luv')
-if not ok then
-    uv = require 'uv'
-    is_luvit = true
-end
+local uv = require 'uv'
 
 local name = string.format("%s@%s", os.getenv("USER") or "unknown", os.getenv("HOSTNAME") or "unknown")
 
@@ -15,10 +10,26 @@ local multicast_addr = {
     port = 31896,
 }
 
+-- Find our local LAN IPv4 address
+local function get_lan_ipv4()
+    local interfaces = uv.interface_addresses()
+    for _, interface in pairs(interfaces) do
+        for _, address in ipairs(interface) do
+            if not address.internal and address.family == "inet" then
+                return address.ip
+            end
+        end
+    end
+    return nil
+end
+local lan_ipv4 = assert(get_lan_ipv4(), "Cannot find local IPv4 Lan Address")
+
+local interface
+
 -- Create a TCP server so other nodes can connect directly to us.
 local server = assert(uv.new_tcp("inet"))
 -- Pick a random open port on the local machine.
-assert(server:bind("0.0.0.0", 0, { reuseaddr = false }))
+assert(server:bind(lan_ipv4, 0, { reuseaddr = false }))
 -- Save the address, we'll reuse us for our UDP sender so that
 -- other nodes can connect to us on either protocol with the same address.
 local address = assert(server:getsockname())
@@ -37,9 +48,9 @@ assert(address2.port == address.port)
 local multi = assert(uv.new_udp(multicast_addr.family))
 -- Bind to 239.255.13.7:31896, allow port re-use so that multiple instances
 -- of this program can all subscribe to the UDP broadcasts
-assert(multi:bind("0.0.0.0", multicast_addr.port, { reuseaddr = true }))
+assert(multi:bind(lan_ipv4, multicast_addr.port, { reuseaddr = true }))
 -- Join the multicast group on 239.255.13.7
-assert(multi:set_membership(multicast_addr.ip, "0.0.0.0", "join"))
+assert(multi:set_membership(multicast_addr.ip, lan_ipv4, "join"))
 local address3 = assert(multi:getsockname())
 print(string.format("Multicast receiver listening on %s:%s (interface %s)\n",
     multicast_addr.ip, address3.port, address3.ip));
@@ -150,7 +161,3 @@ uv.signal_start(sig, "sigint", function()
         uv.stop()
     end)
 end)
-
-if not is_luvit then
-    uv.run()
-end
