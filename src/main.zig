@@ -2,7 +2,7 @@ const std = @import("std");
 const network = @import("network");
 
 // Multicast UDP example
-// listens on 224.0.0.1 (all machines on subnet) on port 31896
+// listens on 239.255.0.1 (all machines on subnet) on port 31896
 
 // You can run this on any node on your local network,
 // each instance will receive UDPs sent to the multicast address
@@ -11,7 +11,7 @@ const network = @import("network");
 // for the same UDP broadcast on the same port.
 
 // test this by doing this from any machine on the network
-// echo "this is a test" | nc -u -w0 224.0.0.1 31896
+// echo "this is a test" | nc -u -w0 239.255.0.1 31896
 
 pub fn main() !void {
     try network.init();
@@ -21,7 +21,7 @@ pub fn main() !void {
     var sock = try network.Socket.create(.ipv4, .udp);
     defer sock.close();
 
-    // Bind to 224.0.0.1:31896, allow port re-use so that multiple instances
+    // Bind to 239.255.0.1:31896, allow port re-use so that multiple instances
     // of this program can all subscribe to the UDP broadcasts
     try sock.enablePortReuse(true);
     const incoming_endpoint = network.EndPoint{
@@ -32,7 +32,7 @@ pub fn main() !void {
         std.debug.print("failed to bind to {}:{}\n", .{ incoming_endpoint, err });
     };
 
-    // Join the multicast group on 224.0.0.1
+    // Join the multicast group on 239.255.0.1
     const all_group = network.Socket.MulticastGroup{
         .group = network.Address.IPv4.multicast_all,
         .interface = network.Address.IPv4.any,

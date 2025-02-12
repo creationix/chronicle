@@ -5,20 +5,17 @@ if not ok then
     is_luvit = true
 end
 
--- Multicast UDP example
--- listens on 239.255.0.1 (all machines on subnet) on port 31896
+local name = os.getenv("PROGRAM") or os.getenv("USER") or os.getenv("HOSTNAME") or "unknown"
 
--- You can run this on any node on your local network,
--- each instance will receive UDPs sent to the multicast address
+-- You can use netcat to send test messages to this service
+-- echo "this is a test" | nc -u -w0 239.255.13.7 31896
+local multicast_addr = {
+    family = "inet",
+    ip = "239.255.13.7",
+    port = 31896,
+}
 
--- You can run multiple instances of this program, all listening
--- for the same UDP broadcast on the same port.
-
--- test this by doing this from any machine on the network
--- echo "this is a test" | nc -u -w0 239.255.0.1 31896
-
--- Create a TCP server so other nodes can connect directly to us and have reliable
--- RPC conversations
+-- Create a TCP server so other nodes can connect directly to us.
 local server = assert(uv.new_tcp("inet"))
 -- Pick a random open port on the local machine.
 assert(server:bind("0.0.0.0", 0, { reuseaddr = false }))
@@ -30,21 +27,22 @@ print(string.format("TCP Server listening on %s:%s", address.ip, address.port))
 -- Make a UDP handle that matches the TCP one for sending UDP messages
 local udp_sender = assert(uv.new_udp(address.family))
 assert(udp_sender:bind(address.ip, address.port, { reuseaddr = false }))
+local address2 = assert(udp_sender:getsockname())
+print(string.format("UDP Server listening on %s:%s", address2.ip, address2.port))
+assert(address2.ip == address.ip)
+assert(address2.port == address.port)
 
-local multi_address = {
-    family = "inet",
-    port = 31896,
-    ip = "239.255.0.1"
-}
+
 -- Create a UDP socket for receiving multicast messages
-local multi = assert(uv.new_udp(multi_address.family))
--- Bind to 239.255.0.1:31896, allow port re-use so that multiple instances
+local multi = assert(uv.new_udp(multicast_addr.family))
+-- Bind to 239.255.13.7:31896, allow port re-use so that multiple instances
 -- of this program can all subscribe to the UDP broadcasts
-assert(multi:bind(multi_address.ip, multi_address.port, { reuseaddr = true }))
--- Join the multicast group on 239.255.0.1
-assert(multi:set_membership(multi_address.ip, "0.0.0.0", "join"))
-print(string.format("Multicast receiver listening on %s:%s\n",
-    multi_address.ip, multi_address.port));
+assert(multi:bind("0.0.0.0", multicast_addr.port, { reuseaddr = true }))
+-- Join the multicast group on 239.255.13.7
+assert(multi:set_membership(multicast_addr.ip, "0.0.0.0", "join"))
+local address3 = assert(multi:getsockname())
+print(string.format("Multicast receiver listening on %s:%s (interface %s)\n",
+    multicast_addr.ip, address3.port, address3.ip));
 
 -- Listen for multicast events
 multi:recv_start(function(err, data, addr)
@@ -57,20 +55,22 @@ multi:recv_start(function(err, data, addr)
     print(string.format("%s:%s - %s", addr.ip, addr.port, tostring(data)))
 end)
 
+local function log_error(err)
+    if err then error(err) end
+end
+
+local function send(socket, message)
+    local addr = assert(socket:getsockname())
+    print(string.format("Sending from %s:%s to multicast network %s:%s...",
+        addr.ip, addr.port,
+        multicast_addr.ip, multicast_addr.port))
+    assert(socket:send(message, multicast_addr.ip, multicast_addr.port, log_error))
+end
 
 local timer = assert(uv.new_timer())
 timer:start(2000, 2000, function()
-    print(string.format("sending from %s:%s", udp_sender:getsockname().ip, udp_sender:getsockname().port))
-    assert(multi:send("coming from multi", multi_address.ip, multi_address.port, function(err)
-        if err then
-            print("send error: " .. tostring(err))
-        end
-    end))
-    assert(udp_sender:send("Tim: " .. tostring(uv.hrtime()), multi_address.ip, multi_address.port, function(err)
-        if err then
-            print("send error: " .. tostring(err))
-        end
-    end))
+    send(multi, string.format("%s: sending from multi %s", name, uv.hrtime()))
+    send(udp_sender, string.format("%s: sending from udp_sender %s", name, uv.hrtime()))
 end)
 
 if not is_luvit then
