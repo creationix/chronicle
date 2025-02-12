@@ -2,7 +2,7 @@ local uv = require 'uv'
 
 local name = string.format("%s@%s",
     os.getenv("USER") or os.getenv("USERNAME") or "unknown",
-    os.getenv("HOSTNAME") or os.getenv("USERDOMAIN") or "unknown")
+    uv.os_gethostname() or os.getenv("HOSTNAME") or os.getenv("USERDOMAIN") or "unknown")
 
 -- You can use netcat to send test messages to this service
 -- echo "this is a test" | nc -u -w0 224.0.0.1 31896
