@@ -54,14 +54,14 @@ local send_udp = assert(uv.new_udp(address.family))
 -- Bind to a matching IP and port as the TCP server.
 assert(send_udp:bind(address.ip, address.port, { reuseaddr = false }))
 
+
 local clock = 0
-local function send(message, cb)
+local function send(message, cb, addr)
+    addr = addr or multicast_addr
     clock = clock + 1
     local out = string.format("%s: %d %s", name, clock, message)
     print("-> " .. out)
-    -- assert(multi:send(out, multicast_addr.ip, multicast_addr.port,
-    --     cb or log_error))
-    assert(send_udp:send(out, multicast_addr.ip, multicast_addr.port,
+    assert(send_udp:send(out, addr.ip, addr.port,
         cb or log_error))
 end
 
@@ -93,7 +93,7 @@ local function remove_peer(name, addr)
     peers[key] = nil
 end
 
-multi:recv_start(function(err, data, addr)
+local function on_udp(err, data, addr)
     if err then
         print("Error reading multicast messages: " .. tostring(err))
         return
@@ -108,11 +108,11 @@ multi:recv_start(function(err, data, addr)
             -- print(string.format("Received my own message: %s", message))
         else
             if message == "HELLO" or message == "WELCOME" then
+                if message == "HELLO" then
+                    send("WELCOME", nil, addr)
+                end
                 if add_peer(sender, addr) then
                     show_peers()
-                end
-                if message == "HELLO" then
-                    send("WELCOME")
                 end
             elseif message == "GOODBYE" then
                 remove_peer(sender, addr)
@@ -125,7 +125,10 @@ multi:recv_start(function(err, data, addr)
     else
         print(string.format("Received malformed message: %s", tostring(data)))
     end
-end)
+end
+
+multi:recv_start(on_udp)
+send_udp:recv_start(on_udp)
 
 send("HELLO")
 
@@ -136,11 +139,13 @@ uv.signal_start(sig, "sigint", function()
     server:close()
     sig:close()
     multi:recv_stop()
+    send_udp:recv_stop()
     send("GOODBYE", function(err)
         if err then
             print("Error sending goodbye message: " .. tostring(err))
         end
         multi:close()
+        send_udp:close()
         uv.stop()
         print("Done!")
     end)
