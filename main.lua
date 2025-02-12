@@ -24,8 +24,6 @@ local function get_lan_ipv4()
 end
 local lan_ipv4 = assert(get_lan_ipv4(), "Cannot find local IPv4 Lan Address")
 
-local interface
-
 -- Create a TCP server so other nodes can connect directly to us.
 local server = assert(uv.new_tcp("inet"))
 -- Pick a random open port on the local machine.
@@ -34,14 +32,6 @@ assert(server:bind(lan_ipv4, 0, { reuseaddr = false }))
 -- other nodes can connect to us on either protocol with the same address.
 local address = assert(server:getsockname())
 print(string.format("TCP Server listening on %s:%s", address.ip, address.port))
-
--- Make a UDP handle that matches the TCP one for sending UDP messages
-local udp_sender = assert(uv.new_udp(address.family))
-assert(udp_sender:bind(address.ip, address.port, { reuseaddr = false }))
-local address2 = assert(udp_sender:getsockname())
-print(string.format("UDP Server listening on %s:%s", address2.ip, address2.port))
-assert(address2.ip == address.ip)
-assert(address2.port == address.port)
 
 
 -- Create a UDP socket for receiving multicast messages
@@ -76,7 +66,7 @@ local function send(message, cb)
     clock = clock + 1
     local out = string.format("%s: %d %s", name, clock, message)
     print("-> " .. out)
-    assert(udp_sender:send(out, multicast_addr.ip, multicast_addr.port,
+    assert(multi:send(out, multicast_addr.ip, multicast_addr.port,
         cb or log_error))
 end
 
@@ -118,10 +108,10 @@ multi:recv_start(function(err, data, addr)
     local sender, nclock, message = data:match("(%S+):%s*(%d+)%s*(.*)")
     local newclock = tonumber(nclock)
     if sender and newclock and message then
+        print("<- " .. tostring(data))
         if sender == name then
             -- print(string.format("Received my own message: %s", message))
         else
-            print("<- " .. tostring(data))
             if message == "HELLO" then
                 if newclock < clock then
                     send("HELLO")
@@ -148,16 +138,16 @@ send("HELLO")
 local sig = assert(uv.new_signal())
 uv.signal_start(sig, "sigint", function()
     print("Received SIGINT, shutting down...")
-    multi:close()
     server:close()
     sig:close()
+    multi:recv_stop()
     send("GOODBYE", function(err)
         if err then
             print("Error sending goodbye message: " .. tostring(err))
         else
             print("Goodbye message sent.")
         end
-        udp_sender:close()
+        multi:close()
         uv.stop()
     end)
 end)
