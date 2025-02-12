@@ -61,12 +61,18 @@ local function log_error(err)
     if err then error(err) end
 end
 
+local send_udp = assert(uv.new_udp(address.family))
+-- Bind to a matching IP and port as the TCP server.
+assert(send_udp:bind(address.ip, address.port, { reuseaddr = false }))
+
 local clock = 0
 local function send(message, cb)
     clock = clock + 1
     local out = string.format("%s: %d %s", name, clock, message)
     print("-> " .. out)
-    assert(multi:send(out, multicast_addr.ip, multicast_addr.port,
+    -- assert(multi:send(out, multicast_addr.ip, multicast_addr.port,
+    --     cb or log_error))
+    assert(send_udp:send(out, multicast_addr.ip, multicast_addr.port,
         cb or log_error))
 end
 
