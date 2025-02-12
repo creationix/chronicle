@@ -46,17 +46,6 @@ print(string.format("Multicast receiver listening on %s:%s (interface %s)\n",
     multicast_addr.ip, address3.port, address3.ip));
 assert(multi:set_multicast_ttl(10))
 
--- Listen for multicast events
-multi:recv_start(function(err, data, addr)
-    if err then
-        print("Error reading multicast messages: " .. tostring(err))
-        return
-    elseif data == nil then
-        return
-    end
-    print(string.format("%s:%s - %s", addr.ip, addr.port, tostring(data)))
-end)
-
 local function log_error(err)
     if err then error(err) end
 end
@@ -143,17 +132,16 @@ send("HELLO")
 -- Send goodbye on sigint
 local sig = assert(uv.new_signal())
 uv.signal_start(sig, "sigint", function()
-    print("Received SIGINT, shutting down...")
+    print("\nReceived SIGINT, shutting down...")
     server:close()
     sig:close()
     multi:recv_stop()
     send("GOODBYE", function(err)
         if err then
             print("Error sending goodbye message: " .. tostring(err))
-        else
-            print("Goodbye message sent.")
         end
         multi:close()
         uv.stop()
+        print("Done!")
     end)
 end)
