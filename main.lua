@@ -5,7 +5,7 @@ if not ok then
     is_luvit = true
 end
 
-local name = os.getenv("PROGRAM") or os.getenv("USER") or os.getenv("HOSTNAME") or "unknown"
+local name = string.format("%s@%s", os.getenv("USER") or "unknown", os.getenv("HOSTNAME") or "unknown")
 
 -- You can use netcat to send test messages to this service
 -- echo "this is a test" | nc -u -w0 239.255.13.7 31896
@@ -61,7 +61,7 @@ end
 
 local function send(socket, message)
     local addr = assert(socket:getsockname())
-    print(string.format("Sending from %s:%s to multicast network %s:%s...",
+    print(string.format("Sending to multicast network %s:%s...",
         addr.ip, addr.port,
         multicast_addr.ip, multicast_addr.port))
     assert(socket:send(message, multicast_addr.ip, multicast_addr.port, log_error))
